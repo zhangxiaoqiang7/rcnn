@@ -29,7 +29,7 @@ config.FIXED_PARAMS = ['conv1', 'conv2']
 config.FIXED_PARAMS_SHARED = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5']
 
 # dataset related params
-config.NUM_CLASSES = 21
+config.NUM_CLASSES = 14
 config.SCALES = [(600, 1000)]  # first is scale (the shorter side); second is max size
 config.ANCHOR_SCALES = (8, 16, 32)
 config.ANCHOR_RATIOS = (0.5, 1, 2)
@@ -115,8 +115,8 @@ default.pretrained_epoch = 0
 default.base_lr = 0.001
 # default dataset
 default.dataset = 'PascalVOC'
-default.image_set = '2007_trainval'
-default.test_image_set = '2007_test'
+default.image_set = '2007_train'
+default.test_image_set = '2012_test'
 default.root_path = 'data'
 default.dataset_path = 'data/VOCdevkit'
 # default training

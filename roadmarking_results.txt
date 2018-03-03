@@ -1,0 +1,89 @@
+VOC_RM:13 classes
+VOC2007train(6472) -> VOC2012test(2922)
+10 epoch, 9 anchor, nms threshold:0.3, base_lr = 0.001
+------------------------------------------------------
+Distribution of the number of class samples:
+train:
+{
+    c60 = 50
+    c70 = 258
+    car_people = 119
+    center_ring = 99
+    cross_hatch = 49
+    diamond = 873
+    forward_left = 498
+    forward_right = 741
+    forward = 1824
+    left = 338
+    right = 418
+    u_turn = 132
+    zebra_crossing = 4306
+}
+test:
+{
+    c60 = 10
+    c70 = 112
+    car_people = 100
+    center_ring = 172
+    cross_hatch = 29
+    diamond = 497
+    forward_left = 182
+    forward_right = 432
+    forward = 1145
+    left = 491
+    right = 125
+    u_turn = 24
+    zebra_crossing = 1376
+}
+===========================
+rcnn vgg16 no-flip
+threshold: 1e-3
+===========================
+INFO:root:AP for c60 = 0.2799
+INFO:root:AP for c70 = 0.6482
+INFO:root:AP for car_people = 0.6468
+INFO:root:AP for center_ring = 0.3850
+INFO:root:AP for cross_hatch = 0.3857
+INFO:root:AP for diamond = 0.7962
+INFO:root:AP for forward_left = 0.7423
+INFO:root:AP for forward_right = 0.7122
+INFO:root:AP for forward = 0.7524
+INFO:root:AP for left = 0.6251
+INFO:root:AP for right = 0.6762
+INFO:root:AP for u_turn = 0.8579
+INFO:root:AP for zebra_crossing = 0.6442
+INFO:root:Mean AP = 0.6271
+--------------------------------
+threshold: 0.6
+INFO:root:AP for c60 = 0.1000
+INFO:root:AP for c70 = 0.6010
+INFO:root:AP for car_people = 0.5454
+INFO:root:AP for center_ring = 0.3102
+INFO:root:AP for cross_hatch = 0.3210
+INFO:root:AP for diamond = 0.7629
+INFO:root:AP for forward_left = 0.6515
+INFO:root:AP for forward_right = 0.5998
+INFO:root:AP for forward = 0.7097
+INFO:root:AP for left = 0.4939
+INFO:root:AP for right = 0.6128
+INFO:root:AP for u_turn = 0.7494
+INFO:root:AP for zebra_crossing = 0.6160
+INFO:root:Mean AP = 0.5441
+===========================
+rcnn resnet101 no-flip
+threshold: 1e-3
+===========================
+INFO:root:AP for c60 = 0.4222
+INFO:root:AP for c70 = 0.6670
+INFO:root:AP for car_people = 0.5628
+INFO:root:AP for center_ring = 0.3718
+INFO:root:AP for cross_hatch = 0.2986
+INFO:root:AP for diamond = 0.8395
+INFO:root:AP for forward_left = 0.7648
+INFO:root:AP for forward_right = 0.7655
+INFO:root:AP for forward = 0.7964
+INFO:root:AP for left = 0.7057
+INFO:root:AP for right = 0.6608
+INFO:root:AP for u_turn = 0.8681
+INFO:root:AP for zebra_crossing = 0.6636
+INFO:root:Mean AP = 0.6451

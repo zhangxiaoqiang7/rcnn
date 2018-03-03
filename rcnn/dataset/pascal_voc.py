@@ -59,6 +59,11 @@ class PascalVOC(IMDB):
                         'cow', 'diningtable', 'dog', 'horse',
                         'motorbike', 'person', 'pottedplant',
                         'sheep', 'sofa', 'train', 'tvmonitor']
+        # VOC_RM 13 classes
+        self.classes = ['__background__',  # always index 0
+                        'c60', 'c70', 'car_people', 'center_ring', 'cross_hatch',
+                        'diamond', 'forward_left', 'forward_right', 'forward',
+                        'left', 'right', 'u_turn', 'zebra_crossing']
         self.num_classes = len(self.classes)
         self.image_set_index = self.load_image_set_index()
         self.num_images = len(self.image_set_index)
@@ -138,8 +143,8 @@ class PascalVOC(IMDB):
         for ix, obj in enumerate(objs):
             bbox = obj.find('bndbox')
             # Make pixel indexes 0-based
-            x1 = float(bbox.find('xmin').text) - 1
-            y1 = float(bbox.find('ymin').text) - 1
+            x1 = float(bbox.find('xmin').text) + 1
+            y1 = float(bbox.find('ymin').text) + 1
             x2 = float(bbox.find('xmax').text) - 1
             y2 = float(bbox.find('ymax').text) - 1
             cls = class_to_index[obj.find('name').text.lower().strip()]
