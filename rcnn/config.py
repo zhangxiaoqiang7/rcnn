@@ -144,7 +144,8 @@ network = edict()
 network.vgg = edict()
 
 network.resnet = edict()
-network.resnet.pretrained = 'model/resnet-101'
+# network.resnet.pretrained = 'model/resnet-101'
+network.resnet.pretrained = 'model/resnet-50'
 network.resnet.pretrained_epoch = 0
 network.resnet.PIXEL_MEANS = np.array([0, 0, 0])
 network.resnet.IMAGE_STRIDE = 0

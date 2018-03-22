@@ -70,6 +70,41 @@ INFO:root:AP for u_turn = 0.7494
 INFO:root:AP for zebra_crossing = 0.6160
 INFO:root:Mean AP = 0.5441
 ===========================
+rcnn vgg16 no-flip
++ multi-layer pooling(relu5_3,relu4_3,relu3_3)
+threshold: 1e-3
+mAP: + 3.81
+===========================
+INFO:root:AP for c60 = 0.4486
+INFO:root:AP for c70 = 0.7126
+INFO:root:AP for car_people = 0.6991
+INFO:root:AP for center_ring = 0.3800
+INFO:root:AP for cross_hatch = 0.3796
+INFO:root:AP for diamond = 0.8042
+INFO:root:AP for forward_left = 0.7725
+INFO:root:AP for forward_right = 0.7592
+INFO:root:AP for forward = 0.7677
+INFO:root:AP for left = 0.7273
+INFO:root:AP for right = 0.6707
+INFO:root:AP for u_turn = 0.8916
+INFO:root:AP for zebra_crossing = 0.6351
+INFO:root:Mean AP = 0.6652
+epoch 9:
+INFO:root:AP for c60 = 0.3961
+INFO:root:AP for c70 = 0.7162
+INFO:root:AP for car_people = 0.7174
+INFO:root:AP for center_ring = 0.3685
+INFO:root:AP for cross_hatch = 0.3657
+INFO:root:AP for diamond = 0.8133
+INFO:root:AP for forward_left = 0.7776
+INFO:root:AP for forward_right = 0.7591
+INFO:root:AP for forward = 0.7848
+INFO:root:AP for left = 0.7363
+INFO:root:AP for right = 0.6572
+INFO:root:AP for u_turn = 0.9055
+INFO:root:AP for zebra_crossing = 0.6481
+INFO:root:Mean AP = 0.6651
+===========================
 rcnn resnet101 no-flip
 threshold: 1e-3
 ===========================
@@ -87,3 +122,105 @@ INFO:root:AP for right = 0.6608
 INFO:root:AP for u_turn = 0.8681
 INFO:root:AP for zebra_crossing = 0.6636
 INFO:root:Mean AP = 0.6451
+epoch 9:
+INFO:root:AP for c60 = 0.4397
+INFO:root:AP for c70 = 0.6877
+INFO:root:AP for car_people = 0.5790
+INFO:root:AP for center_ring = 0.3738
+INFO:root:AP for cross_hatch = 0.3388
+INFO:root:AP for diamond = 0.8285
+INFO:root:AP for forward_left = 0.7699
+INFO:root:AP for forward_right = 0.7667
+INFO:root:AP for forward = 0.7936
+INFO:root:AP for left = 0.7062
+INFO:root:AP for right = 0.6480
+INFO:root:AP for u_turn = 0.8546
+INFO:root:AP for zebra_crossing = 0.6706
+INFO:root:Mean AP = 0.6506
+===========================
+rcnn resnet101 no-flip
++ multi-layer pooling(stride16,stride8)x10
+threshold: 1e-3
+mAP: + 0.53
+===========================
+INFO:root:AP for c60 = 0.3410
+INFO:root:AP for c70 = 0.6683
+INFO:root:AP for car_people = 0.5987
+INFO:root:AP for center_ring = 0.3914
+INFO:root:AP for cross_hatch = 0.2592
+INFO:root:AP for diamond = 0.8501
+INFO:root:AP for forward_left = 0.7976
+INFO:root:AP for forward_right = 0.7680
+INFO:root:AP for forward = 0.8375
+INFO:root:AP for left = 0.7323
+INFO:root:AP for right = 0.7523
+INFO:root:AP for u_turn = 0.8296
+INFO:root:AP for zebra_crossing = 0.7008
+INFO:root:Mean AP = 0.6559
+===========================
+rcnn resnet50 no-flip
++ multi-layer pooling(stride16,stride8,stride4)x100
+threshold: 1e-3
+mAP: +
+===========================
+INFO:root:AP for c60 = 0.3692
+INFO:root:AP for c70 = 0.6966
+INFO:root:AP for car_people = 0.6522
+INFO:root:AP for center_ring = 0.3950
+INFO:root:AP for cross_hatch = 0.3002
+INFO:root:AP for diamond = 0.8181
+INFO:root:AP for forward_left = 0.7893
+INFO:root:AP for forward_right = 0.7577
+INFO:root:AP for forward = 0.8124
+INFO:root:AP for left = 0.7421
+INFO:root:AP for right = 0.6837
+INFO:root:AP for u_turn = 0.8348
+INFO:root:AP for zebra_crossing = 0.7001
+INFO:root:Mean AP = 0.6578
+===========================
+rcnn resnet50 no-flip
+threshold: 1e-3
+===========================
+INFO:root:AP for c60 = 0.5458
+INFO:root:AP for c70 = 0.7061
+INFO:root:AP for car_people = 0.6053
+INFO:root:AP for center_ring = 0.3638
+INFO:root:AP for cross_hatch = 0.4189
+INFO:root:AP for diamond = 0.8001
+INFO:root:AP for forward_left = 0.7658
+INFO:root:AP for forward_right = 0.7589
+INFO:root:AP for forward = 0.7695
+INFO:root:AP for left = 0.6950
+INFO:root:AP for right = 0.6841
+INFO:root:AP for u_turn = 0.7761
+INFO:root:AP for zebra_crossing = 0.6681
+INFO:root:Mean AP = 0.6583
+epoch 9:
+INFO:root:AP for c60 = 0.5774
+INFO:root:AP for c70 = 0.6710
+INFO:root:AP for car_people = 0.6002
+INFO:root:AP for center_ring = 0.3618
+INFO:root:AP for cross_hatch = 0.3693
+INFO:root:AP for diamond = 0.7984
+INFO:root:AP for forward_left = 0.7774
+INFO:root:AP for forward_right = 0.7640
+INFO:root:AP for forward = 0.7578
+INFO:root:AP for left = 0.7162
+INFO:root:AP for right = 0.7078
+INFO:root:AP for u_turn = 0.9096
+INFO:root:AP for zebra_crossing = 0.6768
+INFO:root:Mean AP = 0.6683
+INFO:root:AP for c60 = 0.5870
+INFO:root:AP for c70 = 0.6832
+INFO:root:AP for car_people = 0.6344
+INFO:root:AP for center_ring = 0.3583
+INFO:root:AP for cross_hatch = 0.3390
+INFO:root:AP for diamond = 0.8058
+INFO:root:AP for forward_left = 0.7735
+INFO:root:AP for forward_right = 0.7510
+INFO:root:AP for forward = 0.7744
+INFO:root:AP for left = 0.7243
+INFO:root:AP for right = 0.6872
+INFO:root:AP for u_turn = 0.8974
+INFO:root:AP for zebra_crossing = 0.6894
+INFO:root:Mean AP = 0.6696
