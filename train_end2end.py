@@ -95,9 +95,26 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
         arg_params['bbox_pred_bias'] = mx.nd.zeros(shape=arg_shape_dict['bbox_pred_bias'])
 
         # multi-layer
-        if 'pool5_reduced_weight' in arg_shape_dict:
-            arg_params['pool5_reduced_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['pool5_reduced_weight'])
-            arg_params['pool5_reduced_bias'] = mx.nd.zeros(shape=arg_shape_dict['pool5_reduced_bias'])
+        # if 'pool5_reduced_weight' in arg_shape_dict:
+        #     arg_params['pool5_reduced_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['pool5_reduced_weight'])
+        #     arg_params['pool5_reduced_bias'] = mx.nd.zeros(shape=arg_shape_dict['pool5_reduced_bias'])
+
+        init = mx.init.Xavier(factor_type="in", rnd_type='gaussian', magnitude=2)
+        init_internal = mx.init.Normal(sigma=0.01)
+        for k in sym.list_arguments():
+            if k in data_shape_dict:
+                continue
+            if k not in arg_params:
+                print 'init', k
+                arg_params[k] = mx.nd.zeros(shape=arg_shape_dict[k])
+                if not k.endswith('bias'):
+                    init_internal(mx.init.InitDesc(k), arg_params[k])
+
+        for k in sym.list_auxiliary_states():
+            if k not in aux_params:
+                print 'init', k
+                aux_params[k] = mx.nd.zeros(shape=aux_shape_dict[k])
+                init(mx.init.InitDesc(k), aux_params[k])
 
     # check parameter shapes
     for k in sym.list_arguments():

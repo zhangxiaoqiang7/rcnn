@@ -26,5 +26,5 @@ gpu=${1:0:1}
 export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
 export PYTHONUNBUFFERED=1
 
-python train_end2end.py --network resnet --gpu $1
-python test.py --network resnet --gpu $gpu
+python train_end2end.py --network resnet --gpu $1 --prefix model/res
+python test.py --network resnet --gpu $gpu --prefix model/res

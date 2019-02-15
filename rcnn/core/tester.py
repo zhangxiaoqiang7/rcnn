@@ -27,10 +27,23 @@ from builtins import range
 
 from .module import MutableModule
 from rcnn.logger import logger
-from rcnn.config import config
+from rcnn.config import config, default
 from rcnn.io import image
 from rcnn.processing.bbox_transform import bbox_pred, clip_boxes
 from rcnn.processing.nms import py_nms_wrapper, cpu_nms_wrapper, gpu_nms_wrapper
+
+import random
+
+classes = ['c60', 'c70', 'car_people', 'center_ring', 'cross_hatch',
+           'diamond', 'forward_left', 'forward_right', 'forward',
+           'left', 'right', 'u_turn', 'zebra_crossing']
+colors = [(255, 52, 179), (30, 144, 255), (255,106,106), (46, 139, 87), (255, 130, 71),
+          (124, 252, 0), (240, 255, 240), (210,180,140), (255, 0, 0),
+          (255, 255, 0), (160, 32, 240), (135, 38, 87), (0, 139, 139)]
+color_cls = dict()
+for cls, color in zip(classes, colors):
+    # color = (random.randint(0, 256), random.randint(0, 256), random.randint(0, 256))  # generate a random color
+    color_cls[cls] = color[::-1]
 
 
 class Predictor(object):
@@ -206,7 +219,11 @@ def pred_eval(predictor, test_data, imdb, vis=False, thresh=1e-3):
 
         if vis:
             boxes_this_image = [[]] + [all_boxes[j][i] for j in range(1, imdb.num_classes)]
-            vis_all_detection(data_dict['data'].asnumpy(), boxes_this_image, imdb.classes, scale)
+            # vis_all_detection(data_dict['data'].asnumpy(), boxes_this_image, imdb.classes, scale)
+
+            im = draw_all_detection(data_dict['data'].asnumpy(), boxes_this_image, imdb.classes, scale)
+            import cv2
+            cv2.imwrite(default.dataset_path + '/test/' + str(i) + '.jpg', im)
 
         t3 = time.time() - t
         t = time.time()
@@ -266,17 +283,21 @@ def draw_all_detection(im_array, detections, class_names, scale):
     color_white = (255, 255, 255)
     im = image.transform_inverse(im_array, config.PIXEL_MEANS)
     # change to bgr
-    im = cv2.cvtColor(im, cv2.cv.CV_RGB2BGR)
+    im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
     for j, name in enumerate(class_names):
         if name == '__background__':
             continue
-        color = (random.randint(0, 256), random.randint(0, 256), random.randint(0, 256))  # generate a random color
+
+        color = color_cls[name]
+        if name in ['c60', 'c70']:
+            name = name[1:]
+        # color = (random.randint(0, 256), random.randint(0, 256), random.randint(0, 256))  # generate a random color
         dets = detections[j]
         for det in dets:
             bbox = det[:4] * scale
             score = det[-1]
             bbox = map(int, bbox)
-            cv2.rectangle(im, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color=color, thickness=2)
-            cv2.putText(im, '%s %.3f' % (class_names[j], score), (bbox[0], bbox[1] + 10),
+            cv2.rectangle(im, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color=color, thickness=3)
+            cv2.putText(im, '%s %.3f' % (name, score), (bbox[0], bbox[1] + 10),
                         color=color_white, fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5)
     return im

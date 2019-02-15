@@ -20,17 +20,6 @@ from rcnn.config import config
 from . import proposal
 from . import proposal_target
 
-# --------------config---------------
-ATTENTION = True
-NO_HIDDEN = False
-CONV_REDUCED = False
-SE_MODULE = False
-MLPOOL = True
-ONLY_ONE = False
-
-
-# --------------config---------------
-
 
 def get_vgg_conv(data):
     """
@@ -91,13 +80,7 @@ def get_vgg_conv(data):
         data=relu5_2, kernel=(3, 3), pad=(1, 1), num_filter=512, workspace=2048, name="conv5_3")
     relu5_3 = mx.symbol.Activation(data=conv5_3, act_type="relu", name="relu5_3")
 
-    conv_feat = {'relu5_3': relu5_3, 'relu4_3': relu4_3, 'relu3_3': relu3_3}
-
-    return conv_feat
-
-
-fc_rela_w = mx.sym.Variable("fc_rela_weight")
-fc_rela_b = mx.sym.Variable("fc_rela_bias")
+    return relu5_3
 
 
 def relation_module(fc_feat, n):
@@ -124,9 +107,9 @@ def relation_module(fc_feat, n):
     # fc_feat_repeat_h = mx.symbol.FullyConnected(data=fc_feat_repeat, num_hidden=512, name="fc_feat_repeat_h")
     # fc_feat_repeat3_h = mx.symbol.FullyConnected(data=fc_feat_repeat3, num_hidden=512, name="fc_feat_repeat3_h")
     rela_fc = mx.symbol.broadcast_add(fc_feat_repeat, fc_feat_repeat3)
-    rela_fc = mx.symbol.Activation(data=rela_fc, act_type="tanh")
+    rela_fc = mx.symbol.Activation(data=rela_fc, act_type="relu")
     # (nxn,d)->(nxn,1)->(n,n,1)
-    rela_fc = mx.symbol.FullyConnected(data=rela_fc, weight=fc_rela_w, bias=fc_rela_b, num_hidden=1, name="fc_rela")
+    rela_fc = mx.symbol.FullyConnected(data=rela_fc, num_hidden=1, name="fc_rela")
     rela_fc = mx.symbol.reshape(data=rela_fc, shape=(n, n, 1))
     rela_fc = mx.symbol.Activation(data=rela_fc, act_type="sigmoid")
     # rela_fc = mx.symbol.softmax(data=rela_fc, axis=1)
@@ -138,150 +121,7 @@ def relation_module(fc_feat, n):
     return fc_feat + rela_fc_at
 
 
-def se_module(data, num_filter):
-    body = mx.sym.Pooling(data=data, global_pool=True, kernel=(7, 7), pool_type='avg', name='se_pool1')
-    body = mx.sym.Convolution(data=body, num_filter=num_filter // 16, kernel=(1, 1), stride=(1, 1), pad=(0, 0),
-                              name="se_conv1")
-    body = mx.symbol.Activation(data=body, act_type='relu', name='se_relu1')
-    body = mx.sym.Convolution(data=body, num_filter=num_filter, kernel=(1, 1), stride=(1, 1), pad=(0, 0),
-                              name="se_conv2")
-    body = mx.symbol.Activation(data=body, act_type='sigmoid', name="se_sigmoid")
-    conv3 = mx.symbol.broadcast_mul(data, body)
-
-    return conv3
-
-
-fc_u_w = mx.sym.Variable("fc_u_weight")
-fc_u_b = mx.sym.Variable("fc_u_bias")
-fc_h_w = mx.sym.Variable("fc_h_weight")
-fc_b_w = mx.sym.Variable("fc_b_weight")
-fc_b_b = mx.sym.Variable("fc_b_bias")
-
-
-def get_channel_wise_attention(data, hidden, n):
-    """
-    data:feature map,(n,c,h,w)
-    hidden:fc,(n,hidden)
-    n:batch size
-    attention vec:(n,c)
-    output:at_feature_map,(n,c,h,w)
-    """
-    # data_bg = mx.symbol.BlockGrad(data=data)
-    # hidden_bg = mx.symbol.BlockGrad(data=hidden)
-    data_bg = data
-    hidden_bg = hidden
-    # (nxc,hxw)
-    feat_map_u = mx.symbol.reshape(data=data_bg, shape=(-3, -3))
-    # wc:(kx(hxw)),bc:(k,),output:(nxc,k),(n,c,k),(c,n,k)
-    fc_u = mx.symbol.FullyConnected(data=feat_map_u, weight=fc_u_w, bias=fc_u_b, num_hidden=512, name="fc_u")
-    fc_u_r = mx.symbol.reshape(data=fc_u, shape=(-4, n, -1, -2))
-    fc_u_t = mx.symbol.transpose(data=fc_u_r, axes=(1, 0, 2))
-    # whc:(kxd),output:(n,k)
-    fc_h = mx.symbol.FullyConnected(data=hidden_bg, weight=fc_h_w, num_hidden=512, no_bias=1, name="fc_h")
-    # (c,n,k)
-    fc_add = mx.symbol.broadcast_add(fc_u_t, fc_h)
-    b = mx.symbol.Activation(data=fc_add, act_type="tanh", name="b")
-    # (cxn,k)
-    b_r = mx.symbol.reshape(data=b, shape=(-3, -2))
-    # wi:(k,),bi:(1,),output:(cxn,1),(c,n),(n,c)
-    fc_b = mx.symbol.FullyConnected(data=b_r, weight=fc_b_w, bias=fc_b_b, num_hidden=1, name="fc_b")
-    fc_b_r = mx.symbol.reshape(data=fc_b, shape=(-4, -1, n))
-    fc_b_t = mx.symbol.transpose(data=fc_b_r, axes=(1, 0))
-    # (n,c)
-    at_vec = mx.symbol.softmax(data=fc_b_t, axis=1, name="at_vec")
-    at_vec_r = mx.symbol.reshape(data=at_vec, shape=(0, 0, 1, 1))
-    feat_map_at = mx.symbol.broadcast_mul(data, at_vec_r * 1000)
-
-    return feat_map_at
-
-
-def get_channel_wise_attention_no_h(data, n):
-    """
-    data:feature map,(n,c,h,w)
-    attention vec:(n,c)
-    output:at_feature_map,(n,c,h,w)
-    """
-    # data_bg = mx.symbol.BlockGrad(data=data)
-    data_bg = data
-    # (nxc,hxw)
-    feat_map_u = mx.symbol.reshape(data=data_bg, shape=(-3, -3))
-    # wc:(kx(hxw)),bc:(k,),output:(nxc,k)
-    fc_u = mx.symbol.FullyConnected(data=feat_map_u, num_hidden=512, name="fc_u")
-    # (nxc,k)
-    b = mx.symbol.Activation(data=fc_u, act_type="tanh", name="b")
-    # wi:(k,),bi:(1,),output:(nxc,1),(n,c)
-    fc_b = mx.symbol.FullyConnected(data=b, num_hidden=1, name="fc_b")
-    fc_b_r = mx.symbol.reshape(data=fc_b, shape=(-4, n, -1))
-    # (n,c)
-    at_vec = mx.symbol.softmax(data=fc_b_r, axis=1, name="at_vec")
-    if ONLY_ONE:
-        # (1,c)
-        at_vec = mx.symbol.mean(data=at_vec, axis=0, keepdims=1)
-    at_vec_r = mx.symbol.reshape(data=at_vec, shape=(0, 0, 1, 1))
-    feat_map_at = mx.symbol.broadcast_mul(data, at_vec_r * 1000)
-
-    return feat_map_at
-
-
-fc6_w = mx.sym.Variable("fc6_at_weight")
-fc6_b = mx.sym.Variable("fc6_at_bias")
-fc7_w = mx.sym.Variable("fc7_weight")
-fc7_b = mx.sym.Variable("fc7_bias")
-
-
-def get_fc_net(data):
-    flatten = mx.symbol.Flatten(data=data, name="flatten")
-    fc6 = mx.symbol.FullyConnected(data=flatten, weight=fc6_w, bias=fc6_b, num_hidden=4096, name="fc6_at")
-    relu6 = mx.symbol.Activation(data=fc6, act_type="relu", name="relu6")
-    # drop6 = mx.symbol.Dropout(data=relu6, p=0.5)
-    # group 7
-    fc7 = mx.symbol.FullyConnected(data=relu6, weight=fc7_w, bias=fc7_b, num_hidden=4096, name="fc7")
-    relu7 = mx.symbol.Activation(data=fc7, act_type="relu", name="relu7")
-    # drop7 = mx.symbol.Dropout(data=relu7, p=0.5)
-
-    return relu7
-
-
-def get_multi_layer_feature(conv_feat, rois):
-    """
-    multi-layer pooling
-    :param conv_feat: multi-layer feature
-    :param rois: proposals
-    :return: pooled multi-layer fusion feature
-    """
-    pool5_1 = mx.symbol.ROIPooling(
-        name='roi_pool5_1', data=conv_feat['relu5_3'], rois=rois, pooled_size=(7, 7),
-        spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
-    pool5_2 = mx.symbol.ROIPooling(
-        name='roi_pool5_2', data=conv_feat['relu4_3'], rois=rois, pooled_size=(7, 7),
-        spatial_scale=2.0 / config.RCNN_FEAT_STRIDE)
-    pool5_3 = mx.symbol.ROIPooling(
-        name='roi_pool5_3', data=conv_feat['relu3_3'], rois=rois, pooled_size=(7, 7),
-        spatial_scale=4.0 / config.RCNN_FEAT_STRIDE)
-    # pool5_1_context = mx.symbol.ROIPooling(
-    #     name='roi_pool5_1', data=conv_feat['relu5_3'], rois=rois, pooled_size=(7, 7),
-    #     spatial_scale=2 * 1.0 / config.RCNN_FEAT_STRIDE)
-    # L2 normalization(channel/instance)
-    pool5_1 = mx.symbol.L2Normalization(data=pool5_1, mode='instance', name='norm_1')
-    pool5_2 = mx.symbol.L2Normalization(data=pool5_2, mode='instance', name='norm_2')
-    pool5_3 = mx.symbol.L2Normalization(data=pool5_3, mode='instance', name='norm_3')
-    # pool5_1_context = mx.symbol.L2Normalization(data=pool5_1_context, mode='instance', name='norm_4')
-    # concat
-    pool5_pre = mx.symbol.concat(*[pool5_1, pool5_2, pool5_3], name='pool5_pre')
-    # scale
-    pool5_pre = pool5_pre * 1000
-    # pool5_scale = mx.symbol.Convolution(
-    #     data=pool5_pre, kernel=(1, 1), pad=(0, 0), num_filter=1280, num_group=1280, name='pool5_scale')
-    if CONV_REDUCED:
-        pool5 = mx.symbol.Convolution(
-            data=pool5_pre, kernel=(1, 1), pad=(0, 0), num_filter=512, name='pool5_reduced')
-    else:
-        pool5 = pool5_pre
-
-    return pool5
-
-
-def get_vgg_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS):
+def get_vgg3_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS):
     """
     Faster R-CNN test with VGG 16 conv layers
     :param num_classes: used to determine output size
@@ -292,8 +132,7 @@ def get_vgg_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
     im_info = mx.symbol.Variable(name="im_info")
 
     # shared convolutional layers
-    conv_feat = get_vgg_conv(data)
-    relu5_3 = conv_feat['relu5_3']
+    relu5_3 = get_vgg_conv(data)
 
     # RPN
     rpn_conv = mx.symbol.Convolution(
@@ -327,44 +166,19 @@ def get_vgg_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
             threshold=config.TEST.RPN_NMS_THRESH, rpn_min_size=config.TEST.RPN_MIN_SIZE)
 
     # Fast R-CNN
-    if not MLPOOL:
-        pool5 = mx.symbol.ROIPooling(
-            name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
-    else:
-        # multi-layer pooling
-        pool5 = get_multi_layer_feature(conv_feat, rois)
-
-    # no hidden
-    if NO_HIDDEN and ATTENTION:
-        pool5 = get_channel_wise_attention_no_h(data=pool5, n=config.TEST.RPN_POST_NMS_TOP_N)
-        # drop7 = get_fc_net(data=pool5)
-
-    # attention
-    if ATTENTION and not NO_HIDDEN:
-        for r in xrange(1, 2):
-            fc_hidden = get_fc_net(data=pool5)
-            pool5 = get_channel_wise_attention(data=pool5, hidden=fc_hidden, n=config.TEST.RPN_POST_NMS_TOP_N)
-        # drop7 = get_fc_net(data=pool5)
-
-    if not ATTENTION and SE_MODULE:
-        pool5 = se_module(data=pool5, num_filter=1280)
-
-    if not ATTENTION and CONV_REDUCED:
-        # group 6
-        flatten = mx.symbol.Flatten(data=pool5, name="flatten")
-        fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
-        relu6 = mx.symbol.Activation(data=fc6, act_type="relu", name="relu6")
-        drop6 = mx.symbol.Dropout(data=relu6, p=0.5, name="drop6")
-        # group 7
-        fc7 = mx.symbol.FullyConnected(data=drop6, num_hidden=4096, name="fc7")
-        relu7 = mx.symbol.Activation(data=fc7, act_type="relu", name="relu7")
-        drop7 = mx.symbol.Dropout(data=relu7, p=0.5, name="drop7")
-    else:
-        drop7 = get_fc_net(data=pool5)
-
+    pool5 = mx.symbol.ROIPooling(
+        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
+    # group 6
+    flatten = mx.symbol.Flatten(data=pool5, name="flatten")
+    fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
+    relu6 = mx.symbol.Activation(data=fc6, act_type="relu", name="relu6")
+    drop6 = mx.symbol.Dropout(data=relu6, p=0.5, name="drop6")
     # relation module
-    # drop7_r = relation_module(drop7, config.TEST.RPN_POST_NMS_TOP_N)
-
+    drop6 = relation_module(drop6, config.TEST.RPN_POST_NMS_TOP_N)
+    # group 7
+    fc7 = mx.symbol.FullyConnected(data=drop6, num_hidden=4096, name="fc7")
+    relu7 = mx.symbol.Activation(data=fc7, act_type="relu", name="relu7")
+    drop7 = mx.symbol.Dropout(data=relu7, p=0.5, name="drop7")
     # classification
     cls_score = mx.symbol.FullyConnected(name='cls_score', data=drop7, num_hidden=num_classes)
     cls_prob = mx.symbol.softmax(name='cls_prob', data=cls_score)
@@ -382,7 +196,7 @@ def get_vgg_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
     return group
 
 
-def get_vgg_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS):
+def get_vgg3_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS):
     """
     Faster R-CNN end-to-end with VGG 16 conv layers
     :param num_classes: used to determine output size
@@ -397,8 +211,7 @@ def get_vgg_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS
     rpn_bbox_weight = mx.symbol.Variable(name='bbox_weight')
 
     # shared convolutional layers
-    conv_feat = get_vgg_conv(data)
-    relu5_3 = conv_feat['relu5_3']
+    relu5_3 = get_vgg_conv(data)
 
     # RPN layers
     rpn_conv = mx.symbol.Convolution(
@@ -453,43 +266,19 @@ def get_vgg_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS
     bbox_weight = group[3]
 
     # Fast R-CNN
-    if not MLPOOL:
-        pool5 = mx.symbol.ROIPooling(
-            name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
-    else:
-        # multi-layer pooling
-        pool5 = get_multi_layer_feature(conv_feat, rois)
-
-    # no hidden
-    if NO_HIDDEN and ATTENTION:
-        pool5 = get_channel_wise_attention_no_h(data=pool5, n=config.TRAIN.BATCH_ROIS)
-        # drop7 = get_fc_net(data=pool5)
-    # attention
-    if ATTENTION and not NO_HIDDEN:
-        for r in xrange(1, 2):
-            fc_hidden = get_fc_net(data=pool5)
-            pool5 = get_channel_wise_attention(data=pool5, hidden=fc_hidden, n=config.TRAIN.BATCH_ROIS)
-        # drop7 = get_fc_net(data=pool5)
-
-    if not ATTENTION and SE_MODULE:
-        pool5 = se_module(data=pool5, num_filter=1280)
-
-    if not ATTENTION and CONV_REDUCED:
-        # group 6
-        flatten = mx.symbol.Flatten(data=pool5, name="flatten")
-        fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
-        relu6 = mx.symbol.Activation(data=fc6, act_type="relu", name="relu6")
-        drop6 = mx.symbol.Dropout(data=relu6, p=0.5, name="drop6")
-        # group 7
-        fc7 = mx.symbol.FullyConnected(data=drop6, num_hidden=4096, name="fc7")
-        relu7 = mx.symbol.Activation(data=fc7, act_type="relu", name="relu7")
-        drop7 = mx.symbol.Dropout(data=relu7, p=0.5, name="drop7")
-    else:
-        drop7 = get_fc_net(data=pool5)
-
+    pool5 = mx.symbol.ROIPooling(
+        name='roi_pool5', data=relu5_3, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
+    # group 6
+    flatten = mx.symbol.Flatten(data=pool5, name="flatten")
+    fc6 = mx.symbol.FullyConnected(data=flatten, num_hidden=4096, name="fc6")
+    relu6 = mx.symbol.Activation(data=fc6, act_type="relu", name="relu6")
+    drop6 = mx.symbol.Dropout(data=relu6, p=0.5, name="drop6")
     # relation module
-    # drop7_r = relation_module(drop7, config.TRAIN.BATCH_ROIS)
-
+    drop6 = relation_module(drop6, config.TRAIN.BATCH_ROIS)
+    # group 7
+    fc7 = mx.symbol.FullyConnected(data=drop6, num_hidden=4096, name="fc7")
+    relu7 = mx.symbol.Activation(data=fc7, act_type="relu", name="relu7")
+    drop7 = mx.symbol.Dropout(data=relu7, p=0.5, name="drop7")
     # classification
     cls_score = mx.symbol.FullyConnected(name='cls_score', data=drop7, num_hidden=num_classes)
     cls_prob = mx.symbol.SoftmaxOutput(name='cls_prob', data=cls_score, label=label, normalization='batch')

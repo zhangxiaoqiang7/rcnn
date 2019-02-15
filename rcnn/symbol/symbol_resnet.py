@@ -65,7 +65,6 @@ def get_resnet_conv(data):
     for i in range(2, units[0] + 1):
         unit = residual_unit(data=unit, num_filter=filter_list[0], stride=(1, 1), dim_match=True,
                              name='stage1_unit%s' % i)
-    stride4 = unit
 
     # res3
     unit = residual_unit(data=unit, num_filter=filter_list[1], stride=(2, 2), dim_match=False, name='stage2_unit1')
@@ -81,8 +80,34 @@ def get_resnet_conv(data):
                              name='stage3_unit%s' % i)
     stride16 = unit
 
-    conv_feats = {'stride16': stride16, 'stride8': stride8, 'stride4': stride4}
+    # res5
+    unit = residual_unit(data=unit, num_filter=filter_list[3], stride=(2, 2), dim_match=False, name='stage4_unit1')
+    for i in range(2, units[3] + 1):
+        unit = residual_unit(data=unit, num_filter=filter_list[3], stride=(1, 1), dim_match=True,
+                             name='stage4_unit%s' % i)
+    stride32 = unit
+
+    conv_feats = {'stride32': stride32, 'stride16': stride16, 'stride8': stride8}
     return conv_feats
+
+
+fc6_w = mx.sym.Variable("fc6_weight")
+fc6_b = mx.sym.Variable("fc6_bias")
+fc7_w = mx.sym.Variable("fc7_weight")
+fc7_b = mx.sym.Variable("fc7_bias")
+
+
+def get_fc_net(data):
+    flatten = mx.symbol.Flatten(data=data, name="flatten")
+    fc6 = mx.symbol.FullyConnected(data=flatten, weight=fc6_w, bias=fc6_b, num_hidden=1024, name="fc6")
+    relu6 = mx.symbol.Activation(data=fc6, act_type="relu", name="relu6")
+    # drop6 = mx.symbol.Dropout(data=relu6, p=0.5)
+    # group 7
+    fc7 = mx.symbol.FullyConnected(data=relu6, weight=fc7_w, bias=fc7_b, num_hidden=1024, name="fc7")
+    relu7 = mx.symbol.Activation(data=fc7, act_type="relu", name="relu7")
+    # drop7 = mx.symbol.Dropout(data=relu7, p=0.5)
+
+    return relu7
 
 
 def get_multi_layer_feature(conv_feat, rois):
@@ -93,13 +118,13 @@ def get_multi_layer_feature(conv_feat, rois):
     :return: pooled multi-layer fusion feature
     """
     pool5_1 = mx.symbol.ROIPooling(
-        name='roi_pool5_1', data=conv_feat['stride16'], rois=rois, pooled_size=(14, 14),
+        name='roi_pool5_1', data=conv_feat['stride32'], rois=rois, pooled_size=(7, 7),
         spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
     pool5_2 = mx.symbol.ROIPooling(
-        name='roi_pool5_2', data=conv_feat['stride8'], rois=rois, pooled_size=(14, 14),
+        name='roi_pool5_2', data=conv_feat['stride16'], rois=rois, pooled_size=(7, 7),
         spatial_scale=2.0 / config.RCNN_FEAT_STRIDE)
     pool5_3 = mx.symbol.ROIPooling(
-        name='roi_pool5_3', data=conv_feat['stride4'], rois=rois, pooled_size=(14, 14),
+        name='roi_pool5_3', data=conv_feat['stride8'], rois=rois, pooled_size=(7, 7),
         spatial_scale=4.0 / config.RCNN_FEAT_STRIDE)
     # L2 normalization
     pool5_1 = mx.symbol.L2Normalization(data=pool5_1, mode='instance', name='norm_1')
@@ -109,13 +134,60 @@ def get_multi_layer_feature(conv_feat, rois):
     pool5_pre = mx.symbol.concat(*[pool5_1, pool5_2, pool5_3], name='pool5_pre')
     # scale
     # 1,10,100 all ok
-    pool5_pre = pool5_pre * 100
+    pool5_pre = pool5_pre * 1000
     # pool5_scale = mx.symbol.Convolution(
     #     data=pool5_pre, kernel=(1, 1), pad=(0, 0), num_filter=1280, num_group=1280, name='pool5_scale')
-    pool5 = mx.symbol.Convolution(
-        data=pool5_pre, kernel=(1, 1), pad=(0, 0), num_filter=1024, name='pool5_reduced')
+    # pool5 = mx.symbol.Convolution(
+    #     data=pool5_pre, kernel=(1, 1), pad=(0, 0), num_filter=1024, name='pool5_reduced')
+    pool5 = pool5_pre
 
     return pool5
+
+
+fc_u_w = mx.sym.Variable("fc_u_weight")
+fc_u_b = mx.sym.Variable("fc_u_bias")
+fc_h_w = mx.sym.Variable("fc_h_weight")
+fc_b_w = mx.sym.Variable("fc_b_weight")
+fc_b_b = mx.sym.Variable("fc_b_bias")
+
+
+def get_channel_wise_attention(data, hidden, n):
+    """
+    data:feature map,(n,c,h,w)
+    hidden:fc,(n,hidden)
+    n:batch size
+    attention vec:(n,c)
+    output:at_feature_map,(n,c,h,w)
+    """
+    # data_bg = mx.symbol.BlockGrad(data=data)
+    # hidden_bg = mx.symbol.BlockGrad(data=hidden)
+    data_bg = data
+    hidden_bg = hidden
+    # (nxc,hxw)
+    feat_map_u = mx.symbol.reshape(data=data_bg, shape=(-3, -3))
+    # wc:(kx(hxw)),bc:(k,),output:(nxc,k),(n,c,k),(c,n,k)
+    fc_u = mx.symbol.FullyConnected(data=feat_map_u, weight=fc_u_w, bias=fc_u_b, num_hidden=1024, name="fc_u")
+    fc_u_r = mx.symbol.reshape(data=fc_u, shape=(-4, n, -1, -2))
+    fc_u_t = mx.symbol.transpose(data=fc_u_r, axes=(1, 0, 2))
+    # whc:(kxd),output:(n,k)
+    fc_h = mx.symbol.FullyConnected(data=hidden_bg, weight=fc_h_w, num_hidden=1024, no_bias=1, name="fc_h")
+    # (c,n,k)
+    fc_add = mx.symbol.broadcast_add(fc_u_t, fc_h)
+    b = mx.symbol.Activation(data=fc_add, act_type="tanh", name="b")
+    # (cxn,k)
+    b_r = mx.symbol.reshape(data=b, shape=(-3, -2))
+    # wi:(k,),bi:(1,),output:(cxn,1),(c,n),(n,c)
+    fc_b = mx.symbol.FullyConnected(data=b_r, weight=fc_b_w, bias=fc_b_b, num_hidden=1, name="fc_b")
+    fc_b_r = mx.symbol.reshape(data=fc_b, shape=(-4, -1, n))
+    fc_b_t = mx.symbol.transpose(data=fc_b_r, axes=(1, 0))
+    # (n,c)
+    at_vec = mx.symbol.softmax(data=fc_b_t, axis=1, name="at_vec")
+    # at_vec = mx.symbol.Activation(data=fc_b_t, act_type="sigmoid", name="at_vec")
+    at_vec_r = mx.symbol.reshape(data=at_vec, shape=(0, 0, 1, 1))
+    feat_map_at = mx.symbol.broadcast_mul(data, at_vec_r * 1000)
+    # feat_map_at = mx.symbol.broadcast_mul(data, at_vec_r)
+
+    return feat_map_at
 
 
 def get_resnet_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS):
@@ -128,7 +200,7 @@ def get_resnet_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCH
 
     # shared convolutional layers
     conv_feats = get_resnet_conv(data)
-    conv_feat = conv_feats['stride16']
+    conv_feat = conv_feats['stride32']
 
     # RPN layers
     rpn_conv = mx.symbol.Convolution(
@@ -183,20 +255,25 @@ def get_resnet_train(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCH
     bbox_weight = group[3]
 
     # # Fast R-CNN
-    roi_pool = mx.symbol.ROIPooling(
-        name='roi_pool5', data=conv_feat, rois=rois, pooled_size=(14, 14), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
+    # roi_pool = mx.symbol.ROIPooling(
+    #     name='roi_pool5', data=conv_feat, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
 
-    # multi-layer pooling
-    # roi_pool = get_multi_layer_feature(conv_feats, rois)
+    # # multi-layer pooling
+    roi_pool = get_multi_layer_feature(conv_feats, rois)
+    # attention
+    for r in xrange(1, 2):
+        fc_hidden = get_fc_net(roi_pool)
+        roi_pool = get_channel_wise_attention(data=roi_pool, hidden=fc_hidden, n=config.TRAIN.BATCH_ROIS)
+    pool1 = get_fc_net(roi_pool)
 
-    # res5
-    unit = residual_unit(data=roi_pool, num_filter=filter_list[3], stride=(2, 2), dim_match=False, name='stage4_unit1')
-    for i in range(2, units[3] + 1):
-        unit = residual_unit(data=unit, num_filter=filter_list[3], stride=(1, 1), dim_match=True,
-                             name='stage4_unit%s' % i)
-    bn1 = mx.sym.BatchNorm(data=unit, fix_gamma=False, eps=eps, use_global_stats=use_global_stats, name='bn1')
-    relu1 = mx.sym.Activation(data=bn1, act_type='relu', name='relu1')
-    pool1 = mx.symbol.Pooling(data=relu1, global_pool=True, kernel=(7, 7), pool_type='avg', name='pool1')
+    # # res5
+    # unit = residual_unit(data=roi_pool, num_filter=filter_list[3], stride=(2, 2), dim_match=False, name='stage4_unit1')
+    # for i in range(2, units[3] + 1):
+    #     unit = residual_unit(data=unit, num_filter=filter_list[3], stride=(1, 1), dim_match=True,
+    #                          name='stage4_unit%s' % i)
+    # bn1 = mx.sym.BatchNorm(data=unit, fix_gamma=False, eps=eps, use_global_stats=use_global_stats, name='bn1')
+    # relu1 = mx.sym.Activation(data=bn1, act_type='relu', name='relu1')
+    # pool1 = mx.symbol.Pooling(data=relu1, global_pool=True, kernel=(7, 7), pool_type='avg', name='pool1')
 
     # classification
     cls_score = mx.symbol.FullyConnected(name='cls_score', data=pool1, num_hidden=num_classes)
@@ -223,7 +300,7 @@ def get_resnet_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHO
 
     # shared convolutional layers
     conv_feats = get_resnet_conv(data)
-    conv_feat = conv_feats['stride16']
+    conv_feat = conv_feats['stride32']
 
     # RPN
     rpn_conv = mx.symbol.Convolution(
@@ -257,20 +334,25 @@ def get_resnet_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHO
             threshold=config.TEST.RPN_NMS_THRESH, rpn_min_size=config.TEST.RPN_MIN_SIZE)
 
     # # Fast R-CNN
-    roi_pool = mx.symbol.ROIPooling(
-        name='roi_pool5', data=conv_feat, rois=rois, pooled_size=(14, 14), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
+    # roi_pool = mx.symbol.ROIPooling(
+    #     name='roi_pool5', data=conv_feat, rois=rois, pooled_size=(7, 7), spatial_scale=1.0 / config.RCNN_FEAT_STRIDE)
 
-    # multi-layer pooling
-    # roi_pool = get_multi_layer_feature(conv_feats, rois)
+    # # multi-layer pooling
+    roi_pool = get_multi_layer_feature(conv_feats, rois)
+    # attention
+    for r in xrange(1, 2):
+        fc_hidden = get_fc_net(roi_pool)
+        roi_pool = get_channel_wise_attention(data=roi_pool, hidden=fc_hidden, n=config.TEST.RPN_POST_NMS_TOP_N)
+    pool1 = get_fc_net(roi_pool)
 
-    # res5
-    unit = residual_unit(data=roi_pool, num_filter=filter_list[3], stride=(2, 2), dim_match=False, name='stage4_unit1')
-    for i in range(2, units[3] + 1):
-        unit = residual_unit(data=unit, num_filter=filter_list[3], stride=(1, 1), dim_match=True,
-                             name='stage4_unit%s' % i)
-    bn1 = mx.sym.BatchNorm(data=unit, fix_gamma=False, eps=eps, use_global_stats=use_global_stats, name='bn1')
-    relu1 = mx.sym.Activation(data=bn1, act_type='relu', name='relu1')
-    pool1 = mx.symbol.Pooling(data=relu1, global_pool=True, kernel=(7, 7), pool_type='avg', name='pool1')
+    # # res5
+    # unit = residual_unit(data=roi_pool, num_filter=filter_list[3], stride=(2, 2), dim_match=False, name='stage4_unit1')
+    # for i in range(2, units[3] + 1):
+    #     unit = residual_unit(data=unit, num_filter=filter_list[3], stride=(1, 1), dim_match=True,
+    #                          name='stage4_unit%s' % i)
+    # bn1 = mx.sym.BatchNorm(data=unit, fix_gamma=False, eps=eps, use_global_stats=use_global_stats, name='bn1')
+    # relu1 = mx.sym.Activation(data=bn1, act_type='relu', name='relu1')
+    # pool1 = mx.symbol.Pooling(data=relu1, global_pool=True, kernel=(7, 7), pool_type='avg', name='pool1')
 
     # classification
     cls_score = mx.symbol.FullyConnected(name='cls_score', data=pool1, num_hidden=num_classes)

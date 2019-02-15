@@ -142,6 +142,11 @@ default.rcnn_lr_step = '6'
 network = edict()
 
 network.vgg = edict()
+network.vgg2 = edict()
+# network.vgg2.RPN_FEAT_STRIDE = 8
+# network.vgg2.RCNN_FEAT_STRIDE = 8
+# network.vgg2.ANCHOR_SCALES = (16, 32, 64)
+network.vgg3 = edict()
 
 network.resnet = edict()
 # network.resnet.pretrained = 'model/resnet-101'
@@ -149,8 +154,9 @@ network.resnet.pretrained = 'model/resnet-50'
 network.resnet.pretrained_epoch = 0
 network.resnet.PIXEL_MEANS = np.array([0, 0, 0])
 network.resnet.IMAGE_STRIDE = 0
-network.resnet.RPN_FEAT_STRIDE = 16
-network.resnet.RCNN_FEAT_STRIDE = 16
+network.resnet.RPN_FEAT_STRIDE = 32  # 16
+network.resnet.RCNN_FEAT_STRIDE = 32  # 16
+network.resnet.ANCHOR_SCALES = (4, 8, 16)
 network.resnet.FIXED_PARAMS = ['conv0', 'stage1', 'gamma', 'beta']
 network.resnet.FIXED_PARAMS_SHARED = ['conv0', 'stage1', 'stage2', 'stage3', 'gamma', 'beta']
 
@@ -179,4 +185,3 @@ def generate_config(_network, _dataset):
             config[k] = v
         elif k in default:
             default[k] = v
-
