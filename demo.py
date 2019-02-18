@@ -21,20 +21,24 @@ import cv2
 import mxnet as mx
 import numpy as np
 from rcnn.logger import logger
-from rcnn.config import config
-from rcnn.symbol import get_vgg_test, get_vgg_rpn_test
+from rcnn.config import config, default
+from rcnn.symbol import get_vgg_test #get_vgg_rpn_test
 from rcnn.io.image import resize, transform
 from rcnn.core.tester import Predictor, im_detect, im_proposal, vis_all_detection, draw_all_detection
 from rcnn.utils.load_model import load_param
 from rcnn.processing.nms import py_nms_wrapper, cpu_nms_wrapper, gpu_nms_wrapper
 
 
+#CLASSES = ('__background__',
+#           'aeroplane', 'bicycle', 'bird', 'boat',
+#           'bottle', 'bus', 'car', 'cat', 'chair',
+#           'cow', 'diningtable', 'dog', 'horse',
+#           'motorbike', 'person', 'pottedplant',
+#           'sheep', 'sofa', 'train', 'tvmonitor')
 CLASSES = ('__background__',
-           'aeroplane', 'bicycle', 'bird', 'boat',
-           'bottle', 'bus', 'car', 'cat', 'chair',
-           'cow', 'diningtable', 'dog', 'horse',
-           'motorbike', 'person', 'pottedplant',
-           'sheep', 'sofa', 'train', 'tvmonitor')
+           'c60', 'c70', 'car_people', 'center_ring', 'cross_hatch',
+           'diamond', 'forward_left', 'forward_right', 'forward',
+           'left', 'right', 'u_turn', 'zebra_crossing')  
 config.TEST.HAS_RPN = True
 SHORT_SIDE = config.SCALES[0][0]
 LONG_SIDE = config.SCALES[0][1]
@@ -121,17 +125,19 @@ def demo_net(predictor, image_name, vis=False):
     boxes_this_image = [[]] + [all_boxes[j] for j in range(1, len(CLASSES))]
 
     # print results
-    logger.info('---class---')
-    logger.info('[[x1, x2, y1, y2, confidence]]')
-    for ind, boxes in enumerate(boxes_this_image):
-        if len(boxes) > 0:
-            logger.info('---%s---' % CLASSES[ind])
-            logger.info('%s' % boxes)
+    if vis:
+        logger.info('---class---')
+        logger.info('[[x1, x2, y1, y2, confidence]]')
+        for ind, boxes in enumerate(boxes_this_image):
+            if len(boxes) > 0:
+                logger.info('---%s---' % CLASSES[ind])
+                logger.info('%s' % boxes)
 
     if vis:
         vis_all_detection(data_dict['data'].asnumpy(), boxes_this_image, CLASSES, im_scale)
     else:
-        result_file = image_name.replace('.', '_result.')
+        # result_file = image_name.replace('.', '_result.')
+        result_file = os.path.join('result', os.path.basename(image_name))
         logger.info('results saved to %s' % result_file)
         im = draw_all_detection(data_dict['data'].asnumpy(), boxes_this_image, CLASSES, im_scale)
         cv2.imwrite(result_file, im)
@@ -140,8 +146,9 @@ def demo_net(predictor, image_name, vis=False):
 def parse_args():
     parser = argparse.ArgumentParser(description='Demonstrate a Faster R-CNN network')
     parser.add_argument('--image', help='custom image', type=str)
-    parser.add_argument('--prefix', help='saved model prefix', type=str)
-    parser.add_argument('--epoch', help='epoch of pretrained model', type=int)
+    parser.add_argument('--dir', help='custom image dir', type=str)
+    parser.add_argument('--prefix', help='saved model prefix', default=default.e2e_prefix, type=str)
+    parser.add_argument('--epoch', help='epoch of pretrained model', default=default.e2e_epoch, type=int)
     parser.add_argument('--gpu', help='GPU device to use', default=0, type=int)
     parser.add_argument('--vis', help='display result', action='store_true')
     args = parser.parse_args()
@@ -153,7 +160,21 @@ def main():
     ctx = mx.gpu(args.gpu)
     symbol = get_vgg_test(num_classes=config.NUM_CLASSES, num_anchors=config.NUM_ANCHORS)
     predictor = get_net(symbol, args.prefix, args.epoch, ctx)
-    demo_net(predictor, args.image, args.vis)
+    if args.image:
+        # single test image
+        demo_net(predictor, args.image, args.vis)
+    else:
+        # a image dir for test
+        # import pdb
+        img_list = os.listdir(args.dir)
+        num = len(img_list)
+        for line in img_list:
+            img_path = os.path.join(args.dir,line)
+            if os.path.isfile(img_path) and os.path.splitext(img_path)[-1] in ['.jpg']:
+                # pdb.set_trace()
+                logger.info('%s' % num)
+                demo_net(predictor, img_path, args.vis)
+                num = num - 1
 
 
 if __name__ == '__main__':

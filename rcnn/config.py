@@ -115,8 +115,8 @@ default.pretrained_epoch = 0
 default.base_lr = 0.001
 # default dataset
 default.dataset = 'PascalVOC'
-default.image_set = '2007_train'
-default.test_image_set = '2012_test'
+default.image_set = '2017_train'
+default.test_image_set = '2017_test'
 default.root_path = 'data'
 default.dataset_path = 'data/VOCdevkit'
 # default training

@@ -1,0 +1,78 @@
+## ROI-wise Reverse Reweighting Network for Road Marking Detection
+## author: zhangxq 
+
+[1]代码说明
+data：训练与测试数据以及cache
+model：预训练模型与checkpoint
+result：可视化测试结果
+rcnn：核心代码
+script：运行脚本文件
+本代码基于mxnet的faster-rcnn进行改写，代码链接如下：https://github.com/apache/incubator-mxnet/tree/master/example/rcnn
+注意：此版本已经经过代码简化，与采用的版本不同。相对于原始的faster-rcnn，进行改写的代码主要有模型代码：rcnn/symbol/symbol_vgg.py，
+训练代码：train_end2end.py，测试代码：rcnn/core/tester.py，以及配置文件；rcnn/config.py，rcnn/dataset/pascal_voc.py
+rcnn/symbol/symbol_vgg.py：
+主要添加多层特征提取函数get_multi_layer_feature，通道特征加权函数get_channel_wise_attention，以及对比算法的SE模块se_module。
+train_end2end.py：
+主要添加参数初始化代码。
+rcnn/core/tester.py:
+主要改写draw_all_detection函数，为每一类标志匹配一种颜色。
+rcnn/config.py：
+主要针对路面标志检测进行参数调整，包括config.NUM_CLASSES=14，default.image_set = '2017_train'，default.test_image_set = '2017_test'
+检测的类别有:
+rcnn/dataset/pascal_voc.py:
+self.classes = ['__background__',  # always index 0
+                        'c60', 'c70', 'car_people', 'center_ring', 'cross_hatch',
+                        'diamond', 'forward_left', 'forward_right', 'forward',
+                        'left', 'right', 'u_turn', 'zebra_crossing']
+
+[2]运行环境
+环境按照README.md中介绍的进行安装。
+代码测试环境：python2.7(Anaconda2) + mxnet1.1 + ubuntu16.04
+
+[3]运行demo.py，进行路面交通标志检测
+本demo支持单张图像和文件夹测试，分别通过--image "image_path"，--dir "image_dir"参数指定，
+结果图像默认保存在result文件夹下。--prefix默认为model/e2e，--epoch默认为10，--gpu默认为0，--vis默认为false，
+即本demo默认运行的是model/e2e-0010.params模型。
+命令示例：
+测试文件夹：python demo.py --dir /media/opt48/data/zhangxq/video/com02/
+测试单张图像：python demo.py --image test.jpg
+
+[4]数据集上的训练与测试
+数据准备：训练数据集为voc数据格式，VOC_RM的地址为：/media/opt48/data/zhangxq/VOC_RM
+opt48地址：IPv4:10.168.56.34,IPv6:fe80::127b:44ff:feb1:4fae,用户名：opt48，密码：opt
+使用软连接将VOC_RM链接到data/VOCdevkit/VOC2017
+预训练模型：下载vgg16预训练模型放到model文件夹下，地址：http://data.dmlc.ml/models/imagenet/vgg/
+运行脚本：bash script/vgg_voc07.sh 0,1 &> vgg_voc07.log
+使用gpu0,1进行训练，gpu0进行测试评估计算mAP，并将log写入vgg_voc07.log文件
+改变rcnn/symbol/symbol_vgg.py中的模型配置，训练不同的模型：
+faster-rcnn：
+ATTENTION = False
+NO_HIDDEN = False
+CONV_REDUCED = False
+SE_MODULE = False
+MLPOOL = False
+ONLY_ONE = False
+R3Net:
+ATTENTION = True
+NO_HIDDEN = False
+CONV_REDUCED = False
+SE_MODULE = False
+MLPOOL = True
+ONLY_ONE = False
+only MLPOOL:
+ATTENTION = False
+NO_HIDDEN = False
+CONV_REDUCED = False
+SE_MODULE = False
+MLPOOL = True
+ONLY_ONE = False
+SE module:
+ATTENTION = False
+NO_HIDDEN = False
+CONV_REDUCED = False
+SE_MODULE = True
+MLPOOL = False
+ONLY_ONE = False
+
+[5]其他
+本代码也包含一些实验性代码，主要有relation_module，get_hypernet_feature等等。

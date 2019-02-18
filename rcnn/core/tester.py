@@ -34,6 +34,7 @@ from rcnn.processing.nms import py_nms_wrapper, cpu_nms_wrapper, gpu_nms_wrapper
 
 import random
 
+# road marking classes and colors
 classes = ['c60', 'c70', 'car_people', 'center_ring', 'cross_hatch',
            'diamond', 'forward_left', 'forward_right', 'forward',
            'left', 'right', 'u_turn', 'zebra_crossing']

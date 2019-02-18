@@ -98,7 +98,7 @@ def train_net(args, ctx, pretrained, epoch, prefix, begin_epoch, end_epoch,
         # if 'pool5_reduced_weight' in arg_shape_dict:
         #     arg_params['pool5_reduced_weight'] = mx.random.normal(0, 0.01, shape=arg_shape_dict['pool5_reduced_weight'])
         #     arg_params['pool5_reduced_bias'] = mx.nd.zeros(shape=arg_shape_dict['pool5_reduced_bias'])
-
+        # weight init
         init = mx.init.Xavier(factor_type="in", rnd_type='gaussian', magnitude=2)
         init_internal = mx.init.Normal(sigma=0.01)
         for k in sym.list_arguments():

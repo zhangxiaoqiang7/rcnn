@@ -139,6 +139,11 @@ def relation_module(fc_feat, n):
 
 
 def se_module(data, num_filter):
+    """
+    data:feature map,(n,c,h,w)
+    num_filter:channel number
+    output: reweighting feature map
+    """
     body = mx.sym.Pooling(data=data, global_pool=True, kernel=(7, 7), pool_type='avg', name='se_pool1')
     body = mx.sym.Convolution(data=body, num_filter=num_filter // 16, kernel=(1, 1), stride=(1, 1), pad=(0, 0),
                               name="se_conv1")
@@ -230,6 +235,10 @@ fc7_b = mx.sym.Variable("fc7_bias")
 
 
 def get_fc_net(data):
+    """
+    data:feature map,(n,c,h,w)
+    output:feature_vec,(n,d)
+    """
     flatten = mx.symbol.Flatten(data=data, name="flatten")
     fc6 = mx.symbol.FullyConnected(data=flatten, weight=fc6_w, bias=fc6_b, num_hidden=4096, name="fc6_at")
     relu6 = mx.symbol.Activation(data=fc6, act_type="relu", name="relu6")
